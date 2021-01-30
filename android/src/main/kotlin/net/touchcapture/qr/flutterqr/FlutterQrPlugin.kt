@@ -17,6 +17,7 @@ class FlutterQrPlugin : FlutterPlugin, ActivityAware {
         @JvmStatic
         fun registerWith(registrar: PluginRegistry.Registrar) {
             FlutterQrPlugin().onAttachedToV1(registrar)
+            PhotoDecoder(registrar)
         }
     }
 
