@@ -1,11 +1,8 @@
 package net.touchcapture.qr.flutterqr
 
-import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.os.AsyncTask
-import android.util.Log
-import java.lang.ref.WeakReference
 import com.google.zxing.common.GlobalHistogramBinarizer
 import com.google.zxing.BinaryBitmap
 import com.google.zxing.MultiFormatReader
@@ -15,16 +12,32 @@ import com.google.zxing.DecodeHintType
 import com.google.zxing.BarcodeFormat
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
-import io.flutter.plugin.common.PluginRegistry
+import io.flutter.plugin.common.BinaryMessenger
 import java.util.*
 import kotlin.collections.ArrayList
 
-class PhotoDecoder(var registrar: PluginRegistry.Registrar) : MethodChannel.MethodCallHandler {
-    private var channel: MethodChannel = MethodChannel(registrar.messenger(), "net.touchcapture.qr.flutterqr/photo_decoder")
+class PhotoDecoder(private val messenger: BinaryMessenger) : MethodChannel.MethodCallHandler {
+    private val channel: MethodChannel
 
-    companion object {
-        val HINTS: MutableMap<DecodeHintType, Any> = EnumMap(DecodeHintType::class.java)
-        init {
+    init {
+        channel = MethodChannel(messenger, "net.touchcapture.qr.flutterqr/photo_decoder")
+        channel.setMethodCallHandler(this)
+    }
+
+    override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
+        when(call.method) {
+            "decode" -> decode(call.arguments as String)
+            else -> result.notImplemented()
+        }
+    }
+
+    fun decode(path: String) {
+        DecoderTask().execute(path)
+    }
+
+    inner class DecoderTask : AsyncTask<String, Void, String?>() {
+        private fun decode(bitmap: Bitmap): String? {
+            val HINTS: MutableMap<DecodeHintType, Any> = EnumMap(DecodeHintType::class.java)
             val allFormats = ArrayList<BarcodeFormat>()
             allFormats.add(BarcodeFormat.AZTEC)
             allFormats.add(BarcodeFormat.CODABAR)
@@ -46,15 +59,7 @@ class PhotoDecoder(var registrar: PluginRegistry.Registrar) : MethodChannel.Meth
             HINTS[DecodeHintType.TRY_HARDER] = BarcodeFormat.QR_CODE
             HINTS[DecodeHintType.POSSIBLE_FORMATS] = allFormats
             HINTS[DecodeHintType.CHARACTER_SET] = "utf-8"
-        }
-    }
 
-    init {
-        channel.setMethodCallHandler(this)
-    }
-
-    inner class DecoderTask : AsyncTask<String, Void, String?>() {
-        private fun decode(bitmap: Bitmap): String? {
             var result: com.google.zxing.Result?
             var source: RGBLuminanceSource? = null
             try {
@@ -110,21 +115,10 @@ class PhotoDecoder(var registrar: PluginRegistry.Registrar) : MethodChannel.Meth
         }
 
         override fun onPostExecute(result: String?) {
-            registrar.activity().runOnUiThread {
+            Shared.activity?.runOnUiThread {
                 channel.invokeMethod("onDecode", (result ?: ""))
             }
         }
-    }
-
-    override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
-        when {
-            call.method == "decode" -> prasePhoto(call.arguments as String)
-            else -> result.notImplemented()
-        }
-    }
-
-    private fun prasePhoto(path: String) {
-        DecoderTask().execute(path)
     }
 
 }

@@ -5,12 +5,11 @@ class PhotoDecoder {
   static const decodeMethodCall = "onDecode";
 
   final String path;
-  final MethodChannel _channel;
-  final Completer<String> _completer;
+  final Completer<String> _completer = Completer<String>();
+  static const MethodChannel _channel =
+      MethodChannel('net.touchcapture.qr.flutterqr/photo_decoder');
 
-  PhotoDecoder(this.path)
-      : _channel = MethodChannel("net.touchcapture.qr.flutterqr/photo_decoder"),
-        _completer = Completer<String>() {
+  PhotoDecoder(this.path) {
     _channel.setMethodCallHandler(
       (MethodCall call) async {
         switch (call.method) {
