@@ -35,8 +35,8 @@ class PhotoDecoder(private val messenger: BinaryMessenger) : MethodChannel.Metho
         DecoderTask().execute(path)
     }
 
-    inner class DecoderTask : AsyncTask<String, Void, String?>() {
-        private fun decode(bitmap: Bitmap): String? {
+    inner class DecoderTask : AsyncTask<String, Void, com.google.zxing.Result?>() {
+        private fun decode(bitmap: Bitmap): com.google.zxing.Result? {
             val HINTS: MutableMap<DecodeHintType, Any> = EnumMap(DecodeHintType::class.java)
             val allFormats = ArrayList<BarcodeFormat>()
             allFormats.add(BarcodeFormat.AZTEC)
@@ -68,14 +68,12 @@ class PhotoDecoder(private val messenger: BinaryMessenger) : MethodChannel.Metho
                 val pixels = IntArray(width * height)
                 bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
                 source = RGBLuminanceSource(width, height, pixels)
-                result = MultiFormatReader().decode(BinaryBitmap(HybridBinarizer(source)), HINTS)
-                return result!!.getText()
+                return MultiFormatReader().decode(BinaryBitmap(HybridBinarizer(source)), HINTS)
             } catch (e: Exception) {
                 e.printStackTrace()
                 if (source != null) {
                     try {
-                        result = MultiFormatReader().decode(BinaryBitmap(GlobalHistogramBinarizer(source)), HINTS)
-                        return result!!.text
+                        return MultiFormatReader().decode(BinaryBitmap(GlobalHistogramBinarizer(source)), HINTS)
                     } catch (e2: Throwable) {
                         e2.printStackTrace()
                     }
@@ -103,7 +101,7 @@ class PhotoDecoder(private val messenger: BinaryMessenger) : MethodChannel.Metho
             }
         }
 
-        override fun doInBackground(vararg params: String): String? {
+        override fun doInBackground(vararg params: String): com.google.zxing.Result? {
             if (params.isNotEmpty()) {
                 var path = params.first()
                 var bitmap = loadBitmap(path)
@@ -114,9 +112,18 @@ class PhotoDecoder(private val messenger: BinaryMessenger) : MethodChannel.Metho
             return null;
         }
 
-        override fun onPostExecute(result: String?) {
+        override fun onPostExecute(result: com.google.zxing.Result?) {
             Shared.activity?.runOnUiThread {
-                channel.invokeMethod("onDecode", (result ?: ""))
+                if (result != null) {
+                    val code = mapOf(
+                            "code" to result.text,
+                            "type" to result.barcodeFormat.name,
+                            "rawBytes" to result.rawBytes)
+                    channel.invokeMethod("onDecode", code)
+                }
+                else {
+                    channel.invokeMethod("onDecode", "")
+                }
             }
         }
     }
